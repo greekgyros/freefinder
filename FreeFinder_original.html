@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Free Period Finder</title>
+<style>
+  :root{
+    --ink:#1b1b1f;
+    --paper:#fbfaf7;
+    --line:#dcd8cf;
+    --accent:#3a5a40;
+    --accent-soft:#e7efe4;
+    --muted:#7a766c;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Georgia', 'Times New Roman', serif;
+    background:var(--paper);
+    color:var(--ink);
+    display:flex;
+    justify-content:center;
+    padding:32px 16px 80px;
+  }
+  .wrap{width:100%;max-width:560px;}
+  h1{
+    font-size:28px;
+    font-weight:normal;
+    margin:0 0 4px;
+    letter-spacing:0.2px;
+  }
+  .sub{
+    color:var(--muted);
+    font-family:Arial, sans-serif;
+    font-size:14px;
+    margin:0 0 28px;
+  }
+  .card{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:24px;
+    margin-bottom:20px;
+  }
+  label{
+    display:block;
+    font-family:Arial, sans-serif;
+    font-size:13px;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+  input[type=text]{
+    width:100%;
+    padding:10px 12px;
+    font-size:16px;
+    border:1px solid var(--line);
+    border-radius:4px;
+    font-family:Arial, sans-serif;
+    margin-bottom:16px;
+  }
+  table.grid{
+    width:100%;
+    border-collapse:collapse;
+    font-family:Arial, sans-serif;
+    font-size:13px;
+  }
+  table.grid th{
+    font-weight:normal;
+    color:var(--muted);
+    padding:6px 4px;
+    text-align:center;
+  }
+  table.grid td{
+    text-align:center;
+    padding:2px;
+  }
+  table.grid th:first-child, table.grid td:first-child{
+    text-align:left;
+    padding-left:2px;
+  }
+  .cell{
+    width:28px;
+    height:28px;
+    border:1px solid var(--line);
+    border-radius:4px;
+    cursor:pointer;
+    display:inline-block;
+    background:#fff;
+  }
+  .cell.on{
+    background:var(--accent);
+    border-color:var(--accent);
+  }
+  button{
+    font-family:Arial, sans-serif;
+    font-size:14px;
+    padding:10px 18px;
+    border:none;
+    border-radius:4px;
+    background:var(--accent);
+    color:#fff;
+    cursor:pointer;
+  }
+  button.secondary{
+    background:transparent;
+    color:var(--accent);
+    border:1px solid var(--accent);
+  }
+  .row{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;}
+  select{
+    padding:10px 12px;
+    font-size:14px;
+    font-family:Arial, sans-serif;
+    border:1px solid var(--line);
+    border-radius:4px;
+  }
+  .names{
+    margin-top:16px;
+    font-family:Arial, sans-serif;
+  }
+  .name-pill{
+    display:inline-block;
+    background:var(--accent-soft);
+    color:var(--accent);
+    padding:6px 12px;
+    border-radius:14px;
+    margin:0 6px 6px 0;
+    font-size:14px;
+  }
+  .empty{
+    color:var(--muted);
+    font-family:Arial, sans-serif;
+    font-size:14px;
+  }
+  .who-you{
+    font-family:Arial, sans-serif;
+    font-size:14px;
+    color:var(--muted);
+    margin-bottom:16px;
+  }
+  .who-you b{color:var(--ink);}
+  .link{
+    font-family:Arial, sans-serif;
+    font-size:13px;
+    color:var(--accent);
+    cursor:pointer;
+    text-decoration:underline;
+    background:none;
+    border:none;
+    padding:0;
+  }
+  .status{font-family:Arial, sans-serif;font-size:13px;color:var(--muted);margin-top:10px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Free Period Finder</h1>
+  <p class="sub">See who else is free, period by period.</p>
+
+  <div id="app"></div>
+</div>
+
+<script>
+const WEEKS = ['A','B'];
+const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat'];
+const PERIODS = [1,2,3,4,5,6];
+
+let currentName = null;
+let currentPeriods = null; // { "A-Mon-1": true, ... }
+let editing = false;
+let setupWeek = 'A';
+
+const app = document.getElementById('app');
+
+function keyFor(name){
+  return 'student:' + name.trim().toLowerCase();
+}
+
+function emptyGrid(){
+  const g = {};
+  WEEKS.forEach(w => DAYS.forEach(d => PERIODS.forEach(p => g[w+'-'+d+'-'+p] = false)));
+  return g;
+}
+
+async function loadStudent(name){
+  try{
+    const res = await window.storage.get(keyFor(name), true);
+    if(!res) return null;
+    return JSON.parse(res.value);
+  }catch(e){
+    return null;
+  }
+}
+
+async function saveStudent(name, data){
+  await window.storage.set(keyFor(name), JSON.stringify(data), true);
+}
+
+async function getAllStudents(){
+  const list = await window.storage.list('student:', true);
+  if(!list || !list.keys) return [];
+  const out = [];
+  for(const k of list.keys){
+    try{
+      const res = await window.storage.get(k, true);
+      if(res){
+        const data = JSON.parse(res.value);
+        out.push(data);
+      }
+    }catch(e){}
+  }
+  return out;
+}
+
+function renderNameEntry(){
+  app.innerHTML = `
+    <div class="card">
+      <label for="nameInput">Your name</label>
+      <input type="text" id="nameInput" placeholder="e.g. Allegra">
+      <button id="continueBtn">Continue</button>
+      <div class="status" id="statusMsg"></div>
+    </div>
+  `;
+  document.getElementById('continueBtn').onclick = async () => {
+    const val = document.getElementById('nameInput').value.trim();
+    if(!val){
+      document.getElementById('statusMsg').textContent = 'Enter your name first.';
+      return;
+    }
+    document.getElementById('statusMsg').textContent = 'Loading...';
+    currentName = val;
+    const existing = await loadStudent(val);
+    if(existing){
+      currentPeriods = existing.periods;
+      renderMain();
+    }else{
+      currentPeriods = emptyGrid();
+      editing = true;
+      renderSetup();
+    }
+  };
+  document.getElementById('nameInput').addEventListener('keydown', e => {
+    if(e.key === 'Enter') document.getElementById('continueBtn').click();
+  });
+}
+
+function renderSetup(){
+  let rows = '';
+  PERIODS.forEach(p => {
+    let cells = `<td><b>P${p}</b></td>`;
+    DAYS.forEach(day => {
+      const k = setupWeek + '-' + day + '-' + p;
+      const on = currentPeriods[k];
+      cells += `<td><span class="cell ${on ? 'on' : ''}" data-key="${k}"></span></td>`;
+    });
+    rows += `<tr>${cells}</tr>`;
+  });
+
+  app.innerHTML = `
+    <div class="card">
+      <p class="who-you">Hi <b>${currentName}</b> — tap every period you're free, for both weeks of your timetable.</p>
+      <div class="row" style="margin-top:0;margin-bottom:16px;">
+        ${WEEKS.map(w => `<button class="${w === setupWeek ? '' : 'secondary'}" data-week="${w}">Week ${w}</button>`).join('')}
+      </div>
+      <table class="grid">
+        <thead><tr><th></th>${DAYS.map(d => `<th>${d}</th>`).join('')}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="row">
+        <button id="saveBtn">Save my periods</button>
+      </div>
+      <div class="status" id="statusMsg2"></div>
+    </div>
+  `;
+
+  document.querySelectorAll('[data-week]').forEach(btn => {
+    btn.onclick = () => {
+      setupWeek = btn.dataset.week;
+      renderSetup();
+    };
+  });
+
+  document.querySelectorAll('.cell').forEach(cell => {
+    cell.onclick = () => {
+      const k = cell.dataset.key;
+      currentPeriods[k] = !currentPeriods[k];
+      cell.classList.toggle('on');
+    };
+  });
+
+  document.getElementById('saveBtn').onclick = async () => {
+    document.getElementById('statusMsg2').textContent = 'Saving...';
+    await saveStudent(currentName, { name: currentName, periods: currentPeriods });
+    editing = false;
+    renderMain();
+  };
+}
+
+async function renderMain(){
+  app.innerHTML = `
+    <div class="card">
+      <p class="who-you">Signed in as <b>${currentName}</b> · <button class="link" id="editLink">edit my periods</button></p>
+      <div class="row">
+        <select id="weekSel">${WEEKS.map(w => `<option value="${w}">Week ${w}</option>`).join('')}</select>
+        <select id="daySel">${DAYS.map(d => `<option value="${d}">${d}</option>`).join('')}</select>
+        <select id="periodSel">${PERIODS.map(p => `<option value="${p}">Period ${p}</option>`).join('')}</select>
+        <button id="checkBtn">Who's free?</button>
+      </div>
+      <div class="names" id="results"></div>
+    </div>
+  `;
+
+  document.getElementById('editLink').onclick = () => {
+    editing = true;
+    renderSetup();
+  };
+  document.getElementById('checkBtn').onclick = showWhosFree;
+
+  await showWhosFree();
+}
+
+async function showWhosFree(){
+  const week = document.getElementById('weekSel').value;
+  const day = document.getElementById('daySel').value;
+  const period = document.getElementById('periodSel').value;
+  const key = week + '-' + day + '-' + period;
+  const resultsEl = document.getElementById('results');
+  resultsEl.innerHTML = '<span class="empty">Checking...</span>';
+
+  const all = await getAllStudents();
+  const free = all.filter(s => s.periods && s.periods[key] && s.name.toLowerCase() !== currentName.toLowerCase());
+
+  if(free.length === 0){
+    resultsEl.innerHTML = '<span class="empty">No one else has marked themselves free then yet.</span>';
+  }else{
+    resultsEl.innerHTML = free.map(s => `<span class="name-pill">${s.name}</span>`).join('');
+  }
+}
+
+renderNameEntry();
+</script>
+</body>
+</html>
