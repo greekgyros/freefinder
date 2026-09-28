@@ -1,7 +1,9 @@
 # Cheatsheet
-### > because we all forget sometimes
+
+-> because we all forget sometimes
 
 ### Managing accounts
+
 List accounts on database
 ```select * from ff.admin_list_accounts();```
 
