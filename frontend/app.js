@@ -389,7 +389,7 @@ function renderAccount(){
       <h2>Your frees</h2>
       <p class="who-you">Across both weeks you've marked ${plural(periodCount, 'free period')}, ${plural(lunchCount, 'lunchtime')} and ${plural(afterCount, 'after-school slot')}.</p>
       <button id="editFreesBtn">Edit my frees</button>
-      </div>
+    </div>
 
     <div class="card danger-zone">
       <h2>Delete account</h2>
