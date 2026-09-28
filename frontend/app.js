@@ -334,6 +334,11 @@ function renderAccount(){
   const body = document.getElementById('tabBody');
   const requests = me.viewers.filter(v => v.status === 'pending');
   const viewers = me.viewers.filter(v => v.status === 'approved');
+  const slotId = k => k.split('-').pop();
+  const lunchCount = me.free.filter(k => slotId(k) === 'L').length;
+  const afterCount = me.free.filter(k => slotId(k) === 'AS').length;
+  const periodCount = me.free.length - lunchCount - afterCount;
+  const plural = (n, word) => `<b>${n}</b> ${word}${n === 1 ? '' : 's'}`;
 
   body.innerHTML = `
     <div class="card">
@@ -382,9 +387,9 @@ function renderAccount(){
 
     <div class="card">
       <h2>Your frees</h2>
-      <p class="who-you">You've marked <b>${me.free.length}</b> free slot${me.free.length === 1 ? '' : 's'} across both weeks.</p>
+      <p class="who-you">Across both weeks you've marked ${plural(periodCount, 'free period')}, ${plural(lunchCount, 'lunchtime')} and ${plural(afterCount, 'after-school slot')}.</p>
       <button id="editFreesBtn">Edit my frees</button>
-    </div>
+      </div>
 
     <div class="card danger-zone">
       <h2>Delete account</h2>
